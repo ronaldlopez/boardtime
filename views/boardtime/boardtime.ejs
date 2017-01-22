@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>BoardTime</title>
+
+    <!-- Viewport mobile tag for sensible mobile support -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+
+    <!--STYLES-->
+    <link rel="stylesheet" href="/styles/importer.css">
+    <!--STYLES END-->
+    <script type="text/javascript">
+    
+    </script>
+  </head>
+
+  <body>
+    
+    <h1>Canvas</h1>
+    <button id="update">Update</button>
+    <canvas id="canvas" width="900" height="600" style="border: solid 1px gray;"></canvas>
+
+    
+    <script src="/js/dependencies/sails.io.js"></script>
+    <script src="/fabric/dist/fabric.min.js"></script>
+    <script src="http://cdn.peerjs.com/0.3/peer.min.js"></script>
+
+    <script>
+        var canvas = new fabric.Canvas('canvas');
+
+        var rect = new fabric.Rect({
+            top : 100,
+            left : 100,
+            width : 60,
+            height : 70,
+            fill : 'red'
+        });
+
+        canvas.add(rect);
+        
+        var peer = new Peer({key: 'lwjd5qra8257b9'});
+
+        var id_peer = null;
+        peer.on('open', function(id) {
+          console.log('My peer ID is: ' + id);
+          id_peer = id;
+          io.socket.emit('server', { data: id });
+        });
+
+        peer.on('connection', function(conn) { 
+          console.log("Peer connection received");
+          conn.on('data', function(data) {
+            //console.log('Data Received');
+            canvas.clear();
+            canvas.add(
+              new fabric.Rect(JSON.parse(data))
+            );
+          });
+          //conn.send('Hello2!');
+        });
+
+        var conn = null;
+        io.socket.on('server', function onServerSentEvent (msg) {
+          conn = peer.connect(msg.data);
+
+          conn.on('open', function() {
+            console.log("open");
+            console.log(conn);
+
+            canvas.on('object:moving',function(){
+              var objects = canvas.getObjects();
+              for (var i in objects){
+                 conn.send(JSON.stringify(objects[i]));
+              }
+            });
+            // Send messages
+            //conn.send('Hello!');
+          });
+        });
+
+        
+
+        io.socket.on('connect', function(){
+          io.socket.emit('boardtime', { data: 'hola server' });
+
+          document.getElementById('update').onclick = function(){
+            var objects = canvas.getObjects();
+            for (var i in objects){
+              io.socket.emit('paint', { data: JSON.stringify(objects[i]) });
+            } 
+          }
+
+          /*canvas.on('object:moving',function(){
+            var objects = canvas.getObjects();
+            for (var i in objects){
+              io.socket.emit('paint', { data: JSON.stringify(objects[i]) });
+            }
+          });*/
+
+          canvas.on('object:rotating',function(){
+            var objects = canvas.getObjects();
+            for (var i in objects){
+              io.socket.emit('paint', { data: JSON.stringify(objects[i]) });
+            }
+          });
+
+          canvas.on('object:scaling',function(){
+            var objects = canvas.getObjects();
+            for (var i in objects){
+              io.socket.emit('paint', { data: JSON.stringify(objects[i]) });
+            }
+          });
+          
+        });
+
+        io.socket.on('paint', function onServerSentEvent (msg) {
+          canvas.clear();
+          canvas.add(
+            new fabric.Rect(JSON.parse(msg.data))
+          );
+        });
+    </script>
+  </body>
+</html>
